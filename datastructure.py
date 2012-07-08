@@ -35,9 +35,10 @@ class non_terminal(object):
 
 # ATN state, not a 'configuration'
 class atn_state(object):
-    def __init__(self, name):
+    def __init__(self, name, final=False):
         self.name = name # state name, int or str
         self.transitions = []
+        self.final = final
     def add_transition(self, edge, another_state):
         # edge could be either epsilon, terminal, non-terminal
         if not isinstance(edge, terminal) and not isinstance(edge, non_terminal) and epsilon != edge: 
@@ -55,6 +56,14 @@ class atn_state(object):
         return self.name == other.name
     def __hash__(self):
         return hash(self.name)
+    def is_stop_state(self):
+        return self.final
+    def transit(self, e):
+        ret = set()
+        for (edge, s) in self.transitions:
+            if e == edge:
+                ret.add(s)
+        return ret
     
 class call_stack(object):
     def __init__(self):
@@ -91,7 +100,7 @@ class atn_config(object):
         if pred != None and not hasattr(pred, 'pred'):
             raise Exception("Predicates must have a method named 'pred' which returns true/false.")
         self.pred = pred
-        self.wasResolved = False
+        self.was_resolved = False
     def __str__(self):
         return "(%s, %s, %s, %s)" % (self.a_state, self.alt, self.stack, self.pred)
     def __eq__(self, other):
@@ -102,11 +111,12 @@ class atn_config(object):
         return hash(`hash(self.a_state) + hash(self.alt) + hash(self.stack) + hash(self.pred)`)
 
 class dfa_state(object):
-    def __init__(self):
-        self.confs = set() # containing atn_states
+    def __init__(self, alt= -1):
+        self.confs = set() # containing confs
         self.overflowed = False # whether recursion overflowed when closuring
-        self.busy = set() # atn_states contained in this dfa_state which is closured
+        self.busy = set() # conf contained in this dfa_state which is closured
         self.recursive_alts = set()
+        self.alt = alt # predicting alt of this dfa, -1 when not determined, only final dfa states has valid(greater than -1) alt number
     def __eq__(self, other):
         if not isinstance(other, dfa_state):
             return False
@@ -126,6 +136,36 @@ class dfa_state(object):
         return ret
     def remove_conf(self, conf):
         self.confs.remove(conf)
+    def add_all_confs(self, confs):
+        self.confs.update(confs)
+    def is_final(self):
+        return self.alt > -1
+    def get_all_predicting_alts(self):
+        if self.is_final():
+            return {self.alt}
+        else:
+            ret = set()
+            for c in self.confs:
+                ret.add(c.alt)
+            return ret
+    def get_all_terminal_edges(self):
+        ret = set()
+        for c in self.confs:
+            a_state = c.a_state
+            for (e, _) in a_state.transitions:
+                if isinstance(e, terminal):
+                    ret.add(e)
+        return ret
+    def move(self, t):
+        ret = set()
+        for (p, i, y, pi) in self.confs:
+            dests = p.transit(t)
+            if len(dests) == 0:
+                continue
+            else:
+                for d in dests:
+                    ret.add((d, i, y, pi))
+        return ret
     
 # dummy pred used in experiments
 class dummy_pred(object):
@@ -140,7 +180,6 @@ class dummy_pred(object):
 class atn(object):
     def __init__(self):
         self.states = set() # all atn_states
-        self.rule_state_mapping = dict() # non-terminal to atn_states set mapping
         self.states_rule_mapping = dict() # atn_states to corresponding non-terminal mapping
         self.n_term_start_state_mapping = dict() # terminal to corresponding start atn_state mapping
         
@@ -155,3 +194,24 @@ class atn(object):
         return ret
     def get_start_state(self, n_term):
         return self.n_term_start_state_mapping[n_term]
+    
+# a dfa for a specific rule
+class dfa(object):
+    def __init__(self):
+        self.states = set()
+        self.final_referers = dict()
+    def add_state(self, d_state):
+        self.states.add(d_state)
+    def contain_state(self, d_state):
+        return d_state in self.states
+    def add_final_state_and_referer(self, alt, d_state):
+        self.states.add(d_state)
+        self.final_referers[alt] = dfa_final_referer(d_state)
+    def overide_final_state(self, alt, d_state):
+        self.states.remove(self.final_referers[alt].state) # delete old final state
+        self.final_referers[alt].state = d_state # final handler point to the new final state
+    
+# retargetable dfa final state
+class dfa_final_referer(object):
+    def __init__(self, d_state):
+        self.state = d_state
