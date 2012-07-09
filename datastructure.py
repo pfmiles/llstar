@@ -1,14 +1,26 @@
+# -*- coding: utf-8 -*-
 import util
+from automata_view.automataview import states_to_dot
+import os
+import tempfile
+
 # define data structures used in ll(*) analysis
 
-epsilon = object() # represents epsilon transition edge
+class epsilon_cls(object):
+    def __init__(self):
+        pass
+    def __str__(self):
+        return 'ε'
+    def __repr__(self):
+        return 'ε'
+epsilon = epsilon_cls() # represents epsilon transition edge
 
 MAX_REC_DEPTH = 10 # maximum recursion depth when closuring
 
 class terminal(object):
     def __init__(self, content):
         self.content = content
-    def _repr__(self):
+    def __repr__(self):
         return "terminal(%r)" % (self.content)
     def __str__(self):
         return self.content
@@ -37,7 +49,7 @@ class non_terminal(object):
 class atn_state(object):
     def __init__(self, name, final=False):
         self.name = name # state name, int or str
-        self.transitions = []
+        self.transitions = set()
         self.final = final
     def add_transition(self, edge, another_state):
         # edge could be either epsilon, terminal, non-terminal
@@ -45,7 +57,7 @@ class atn_state(object):
             raise Exception("ATN transition edge added could only be epsilon, terminal or non-terminals.")
         if not isinstance(another_state, atn_state):
             raise Exception("Destination state should be another ATN state")
-        self.transitions.append((edge, another_state))
+        self.transitions.add((edge, another_state))
     def __repr__(self):
         return "atn_state(%r)" % self.name
     def __str__(self):
@@ -64,6 +76,14 @@ class atn_state(object):
             if e == edge:
                 ret.add(s)
         return ret
+    # adapt to automata-view start
+    def get_id(self): 
+        return self.name
+    def is_final(self):
+        return self.final
+    def get_transitions(self):
+        return self.transitions
+    # adapt to automata-view end
     
 class call_stack(object):
     def __init__(self):
@@ -194,7 +214,21 @@ class atn(object):
         return ret
     def get_start_state(self, n_term):
         return self.n_term_start_state_mapping[n_term]
-    
+    def __to_dot_str(self, dot_name):
+        return states_to_dot(dot_name, 20, 20, self.states)
+    def to_png(self, png_name):
+        dot_str = self.__to_dot_str(png_name)
+        temp_dir = tempfile.gettempdir()
+        dot_file_name = temp_dir + os.sep + png_name + '.dot'
+        dot_file = open(dot_file_name, 'w')
+        dot_file.write(dot_str)
+        dot_file.close()
+        if not os.path.exists('output'):
+            os.mkdir('output')
+        img_file_name = 'output' + os.sep + png_name + '.png'
+        os.system("dot -Tpng %r > %r" % (dot_file_name, img_file_name))
+        os.remove(dot_file_name)
+        
 # a dfa for a specific rule
 class dfa(object):
     def __init__(self):
@@ -215,3 +249,4 @@ class dfa(object):
 class dfa_final_referer(object):
     def __init__(self, d_state):
         self.state = d_state
+        

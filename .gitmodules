@@ -1,0 +1,3 @@
+[submodule "automata-view"]
+	path = automata_view
+	url = https://github.com/pfmiles/automata-view.git

@@ -90,7 +90,7 @@ class rule(object): # grammar rule creator
         ret.n_term_start_state_mapping[self.__get_n_term_this_rule()] = pa
         pa1 = self.__new_atn_state(self.name + "_end", ret, True) # end state
         for i, alt in enumerate(self.alts):
-            pai = self.__new_atn_state(self.name + "_i", ret) # alt start state
+            pai = self.__new_atn_state(self.name + "_" + str(i), ret) # alt start state
             pa.add_transition(epsilon, pai) # start state epsilon transition to alt start state
             if len(alt) != 0:
                 p0 = self.__new_atn_state(str(rule.seq.next_num()), ret) # element transitions start state
@@ -111,7 +111,7 @@ class rule(object): # grammar rule creator
                         match_seq = ele.eles
                         next_state = self.__new_atn_state(str(rule.seq.next_num()), ret)
                         self.__gen_atn_transitions(cur_state, match_seq, next_state, ret)
-                        self.__gen_atn_transitions(next_state, match_seq, cur_state, ret)
+                        self.__gen_atn_transitions(next_state, match_seq, next_state, ret)
                         cur_state = next_state
                     elif isinstance(ele, optional):
                         next_state = self.__new_atn_state(str(rule.seq.next_num()), ret)
@@ -142,16 +142,3 @@ class optional(object):
         self.eles = eles
     def __str__(self):
         return "(%s)?" % " ".join([str(e) for e in self.eles])
-r = rule("A").ks('a', 'b').kc('a', 'c').opt('d', 'e').pred(True)
-r.alt().ele('a').opt('A').kc('a', 'b', 'c').pred(False)
-print r
-
-rb = rule("B").ele('f').ele('g').ele("A").pred(True)
-rb.alt().ele("x").ele("B").pred(False)
-print rb
-
-a = r.to_atn()
-print a
-
-b = rb.to_atn()
-print b
