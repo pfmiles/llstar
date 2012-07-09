@@ -41,7 +41,7 @@ class atn_state(object):
         self.final = final
     def add_transition(self, edge, another_state):
         # edge could be either epsilon, terminal, non-terminal
-        if not isinstance(edge, terminal) and not isinstance(edge, non_terminal) and epsilon != edge: 
+        if not isinstance(edge, terminal) and not isinstance(edge, non_terminal) and not hasattr(edge, 'pred') and epsilon != edge: 
             raise Exception("ATN transition edge added could only be epsilon, terminal or non-terminals.")
         if not isinstance(another_state, atn_state):
             raise Exception("Destination state should be another ATN state")
@@ -181,7 +181,7 @@ class atn(object):
     def __init__(self):
         self.states = set() # all atn_states
         self.states_rule_mapping = dict() # atn_states to corresponding non-terminal mapping
-        self.n_term_start_state_mapping = dict() # terminal to corresponding start atn_state mapping
+        self.n_term_start_state_mapping = dict() # non-terminal to corresponding start atn_state mapping
         
     def get_rule_of_state(self, a_state):
         return self.states_rule_mapping[a_state]
