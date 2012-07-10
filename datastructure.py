@@ -1,8 +1,5 @@
 # -*- coding: utf-8 -*-
 import util
-from automata_view.automataview import states_to_dot
-import os
-import tempfile
 
 # define data structures used in ll(*) analysis
 
@@ -16,6 +13,17 @@ class epsilon_cls(object):
 epsilon = epsilon_cls() # represents epsilon transition edge
 
 MAX_REC_DEPTH = 10 # maximum recursion depth when closuring
+
+# number seq generator
+class seq_gen(object):
+    def __init__(self):
+        self.seed = 0
+    def next_num(self):
+        ret = self.seed
+        self.seed = self.seed + 1
+        return ret
+    def reset(self):
+        self.seed = 0
 
 class terminal(object):
     def __init__(self, content):
@@ -49,7 +57,7 @@ class non_terminal(object):
 class atn_state(object):
     def __init__(self, name, final=False):
         self.name = name # state name, int or str
-        self.transitions = set()
+        self.transitions = []
         self.final = final
     def add_transition(self, edge, another_state):
         # edge could be either epsilon, terminal, non-terminal
@@ -57,7 +65,7 @@ class atn_state(object):
             raise Exception("ATN transition edge added could only be epsilon, terminal or non-terminals.")
         if not isinstance(another_state, atn_state):
             raise Exception("Destination state should be another ATN state")
-        self.transitions.add((edge, another_state))
+        self.transitions.append((edge, another_state))
     def __repr__(self):
         return "atn_state(%r)" % self.name
     def __str__(self):
@@ -103,6 +111,8 @@ class call_stack(object):
         return 0
     def __str__(self):
         return str(self.stack)
+    def __repr__(self):
+        return repr(self.stack)
     def push(self, a_state):
         self.stack.append(a_state)
     def copy_and_pop(self): # duplicate this stack and pop
@@ -111,6 +121,10 @@ class call_stack(object):
         return (stack1.stack.pop(), stack1)
     def get_rec_depth(self, a_state):
         return self.stack.count(a_state)
+    def copy(self):
+        ret = call_stack()
+        ret.stack = list(self.stack)
+        return ret
     
 class atn_config(object):
     def __init__(self, a_state, alt, stack=call_stack(), pred=None):
@@ -123,6 +137,8 @@ class atn_config(object):
         self.was_resolved = False
     def __str__(self):
         return "(%s, %s, %s, %s)" % (self.a_state, self.alt, self.stack, self.pred)
+    def __repr__(self):
+        return "atn_config(%r, %r, %r, %r)" % (self.a_state, self.alt, self.stack, self.pred)
     def __eq__(self, other):
         if not isinstance(other, atn_config):
             return False
@@ -137,18 +153,25 @@ class dfa_state(object):
         self.busy = set() # conf contained in this dfa_state which is closured
         self.recursive_alts = set()
         self.alt = alt # predicting alt of this dfa, -1 when not determined, only final dfa states has valid(greater than -1) alt number
+        self.transitions = []
+        self.id = None
+    def add_transition(self, edge, d_state):
+        if not isinstance(edge, terminal) and not hasattr(edge, 'pred'):
+            raise Exception("DFA transition edges could only be terminals or predicates.")
+        self.transitions.append((edge, d_state))
     def __eq__(self, other):
         if not isinstance(other, dfa_state):
             return False
         return self.confs == other.confs
     def __hash__(self):
-        return hash(`reduce(lambda x, y:x + y, [hash(x) for x in self.confs])`)
+        return hash(`reduce(lambda x, y:x + y, [hash(x) for x in self.confs], 0)`)
     def add_conf(self, conf):
         self.confs.add(conf)
     def __str__(self):
         return "{%s}" % ", ".join([str(x) for x in self.confs])
-    # fetch all confs which has a pred and predicting alternative 'alt'
-    def get_confs_with_preds_of_alt(self, alt):
+    def __repr__(self):
+        return "dfa_state{%r}" % ', '.join([repr(x) for x in self.confs])
+    def get_confs_with_preds_of_alt(self, alt): # fetch all confs which has a pred and predicting alternative 'alt'
         ret = set()
         for c in self.confs:
             if c.pred != None and alt == c.alt:
@@ -178,14 +201,31 @@ class dfa_state(object):
         return ret
     def move(self, t):
         ret = set()
-        for (p, i, y, pi) in self.confs:
+        for c in self.confs:
+            #(p, i, y, pi)
+            p = c.a_state
+            i = c.alt
+            y = c.stack
+            pi = c.pred
+            
             dests = p.transit(t)
             if len(dests) == 0:
                 continue
             else:
                 for d in dests:
-                    ret.add((d, i, y, pi))
+                    ret.add(atn_config(d, i, y, pi))
         return ret
+    # adapt to automata-view start
+    def get_transitions(self):
+        return self.transitions
+    def get_id(self):
+        ret = self.id
+        if self.is_final():
+            ret = ret + "_" + str(self.alt)
+        content = ', '.join([str((str(c.a_state), str(c.alt), str(c.stack), str(c.pred))) for c in self.confs])
+        print "%s = %s" % (ret, content)
+        return ret
+    # adapt to automata-view end
     
 # dummy pred used in experiments
 class dummy_pred(object):
@@ -195,6 +235,8 @@ class dummy_pred(object):
         return self.result
     def __str__(self):
         return `self.result`
+    def __repr__(self):
+        return `self.result` 
 
 # the whole atn network
 class atn(object):
@@ -214,39 +256,41 @@ class atn(object):
         return ret
     def get_start_state(self, n_term):
         return self.n_term_start_state_mapping[n_term]
-    def __to_dot_str(self, dot_name):
-        return states_to_dot(dot_name, 20, 20, self.states)
     def to_png(self, png_name):
-        dot_str = self.__to_dot_str(png_name)
-        temp_dir = tempfile.gettempdir()
-        dot_file_name = temp_dir + os.sep + png_name + '.dot'
-        dot_file = open(dot_file_name, 'w')
-        dot_file.write(dot_str)
-        dot_file.close()
-        if not os.path.exists('output'):
-            os.mkdir('output')
-        img_file_name = 'output' + os.sep + png_name + '.png'
-        os.system("dot -Tpng %r > %r" % (dot_file_name, img_file_name))
-        os.remove(dot_file_name)
+        util.to_png(png_name, 50, 50, self.states)
+    def __str__(self):
+        return str(self.states)
+    def __repr__(self):
+        return "atn(" + repr(self.states) + ")"
         
 # a dfa for a specific rule
 class dfa(object):
     def __init__(self):
         self.states = set()
-        self.final_referers = dict()
+        self.final_states = dict()
+        self.d_dates_seq = seq_gen() # dfa states id sequence generator
     def add_state(self, d_state):
+        d_state.id = "d" + str(self.d_dates_seq.next_num())
         self.states.add(d_state)
     def contain_state(self, d_state):
         return d_state in self.states
-    def add_final_state_and_referer(self, alt, d_state):
-        self.states.add(d_state)
-        self.final_referers[alt] = dfa_final_referer(d_state)
-    def overide_final_state(self, alt, d_state):
-        self.states.remove(self.final_referers[alt].state) # delete old final state
-        self.final_referers[alt].state = d_state # final handler point to the new final state
+    def add_dummy_final_state(self, alt, d_state):
+        d_state.add_conf(atn_config(atn_state("p_dummy_final_" + str(alt)), alt)) # add a special dummy final atn_config, to satisfy dfa_state's equality definition when override final_state
+        self.add_state(d_state)
+        self.final_states[alt] = d_state
+    def override_final_state(self, alt, d_state):
+        old_final = self.final_states[alt]
+        self.final_states[alt] = d_state # final handler point to the new final state
+        for d_s in self.states: # traverse all dfa states and make all transitions targeted old final state to new one
+            for t_s in d_s.transitions[:]:
+                if t_s[1] == old_final:
+                    d_s.transitions.remove(t_s)
+                    d_s.transitions.append((t_s[0], d_state))
+        self.states.remove(old_final) # delete old final state
+    def __str__(self):
+        return str(self.states)
+    def __repr__(self):
+        return "dfa(" + repr(self.states) + ")"
+    def to_png(self, img_name):
+        util.to_png(img_name, 50, 50, self.states)
     
-# retargetable dfa final state
-class dfa_final_referer(object):
-    def __init__(self, d_state):
-        self.state = d_state
-        

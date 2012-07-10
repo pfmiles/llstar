@@ -1,19 +1,15 @@
 # some scripts to create atn network
-from datastructure import terminal, atn, dummy_pred, atn_state, epsilon, non_terminal
+from datastructure import terminal, atn, dummy_pred, atn_state, epsilon, non_terminal, seq_gen
 
 # NOTE: this implementation does not support nested kleene closure structure, since this is an experiment, it needn't :)
 
-class state_seq_gen(object):
-    def __init__(self):
-        self.seed = 0
-    def next_num(self):
-        ret = self.seed
-        self.seed = self.seed + 1
-        return ret
-
 class rule(object): # grammar rule creator
     name_rule_mapping = dict()
-    seq = state_seq_gen() # atn state number generator, global to all grammar rules
+    seq = seq_gen() # atn state number generator, global to all grammar rules
+    @staticmethod
+    def reset(): # reset the rule creator
+        rule.name_rule_mapping.clear()
+        rule.seq.reset()
     def __init__(self, name):
         self.name = name
         self.alts = [[]]
@@ -80,14 +76,14 @@ class rule(object): # grammar rule creator
     def __new_atn_state(self, name_suf, a_net, is_final=False): # create new atn_state
         ret = atn_state("p" + str(name_suf), is_final)
         a_net.states.add(ret)
-        a_net.states_rule_mapping[ret] = self.__get_n_term_this_rule()
+        a_net.states_rule_mapping[ret] = self.get_n_term_this_rule()
         return ret
-    def __get_n_term_this_rule(self): # get the non-terminal representing this rule
+    def get_n_term_this_rule(self): # get the non-terminal representing this rule
         return rule.name_rule_mapping[self.name]
-    def to_atn(self):
-        ret = atn()
+    def to_atn(self, a_net=atn()):
+        ret = a_net
         pa = self.__new_atn_state(self.name, ret)# start state
-        ret.n_term_start_state_mapping[self.__get_n_term_this_rule()] = pa
+        ret.n_term_start_state_mapping[self.get_n_term_this_rule()] = pa
         pa1 = self.__new_atn_state(self.name + "_end", ret, True) # end state
         for i, alt in enumerate(self.alts):
             pai = self.__new_atn_state(self.name + "_" + str(i), ret) # alt start state

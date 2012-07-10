@@ -1,6 +1,11 @@
 # define some basic algorithms of LL(*) analysis
-from datastructure import call_stack, non_terminal, epsilon, MAX_REC_DEPTH, dfa_state, dfa
-from work_station import atn
+from datastructure import call_stack, non_terminal, epsilon, MAX_REC_DEPTH, dfa_state, dfa, atn, atn_config
+
+# holds any global vars required by those algorithms
+class globals_holder(object):
+    a_net = atn()
+    def __init__(self):
+        pass
 
 # alg.11 in paper
 def resolve_with_preds(d_state, conflicts):
@@ -62,49 +67,49 @@ def closure(d_state, conf):
         return set()
     else:
         d_state.busy.add(conf)
-    closure = set()
-    closure.add(conf)
+    ret = set()
+    ret.add(conf)
     
     p, i, y, pi = conf.a_state, conf.alt, conf.stack, conf.pred
     if p.is_stop_state():
         if y.is_empty():
-            for p2 in atn.get_all_destinations_of(atn.get_rule_of_state(p)):
-                closure.update(closure(d_state, (p2, i, call_stack(), pi)))
+            for p2 in globals_holder.a_net.get_all_destinations_of(globals_holder.a_net.get_rule_of_state(p)):
+                ret.update(closure(d_state, atn_config(p2, i, call_stack(), pi)))
         else:
             p1, y1 = y.copy_and_pop()
-            closure.update(closure(d_state, (p1, i, y1, pi)))
+            ret.update(closure(d_state, atn_config(p1, i, y1, pi)))
     for t, s in p.transitions:
         if isinstance(t, non_terminal): # is a non-terminal edge transition
             depth = y.get_rec_depth(s) # recursion depth of t at state s
             if depth == 1:
                 d_state.recursive_alts.add(i)
                 if len(d_state.recursive_alts) > 1:
-                    raise Exception("Likely non-LL regular, recursive alts: " + `d_state.recursive_alts` + ", rule: " + `atn.get_rule_of_state(p)`)
+                    raise Exception("Likely non-LL regular, recursive alts: " + `d_state.recursive_alts` + ", rule: " + `globals_holder.a_net.get_rule_of_state(p)`)
             if depth >= MAX_REC_DEPTH:
                 d_state.overflowed = True
-                return closure
+                return ret
             # push destination state and doing closure with the starting state of t
             stk = y.copy()
             stk.push(s)
-            closure.update(closure(d_state, (atn.get_start_state(t), i, stk, pi)))
+            ret.update(closure(d_state, atn_config(globals_holder.a_net.get_start_state(t), i, stk, pi)))
         elif hasattr(t, 'pred') or epsilon == t: # is predicate or epsilon transition
-            closure.update(closure(d_state, (s, i, y, pi)))
-    return closure
+            ret.update(closure(d_state, atn_config(s, i, y, pi)))
+    return ret
 
 # alg.8 in paper
-def creat_dfa(a_start_state):
+def create_dfa(a_start_state):
     ret = dfa()
     work = []
     D0 = dfa_state() # dfa start state for this rule
     for alt in range(len(a_start_state.transitions)): # init all final states, num of start state transitions is num of alts
         f_i = dfa_state(alt)
-        ret.add_final_state_and_referer(alt, f_i)
+        ret.add_dummy_final_state(alt, f_i)
     for i, (_, pa_i) in enumerate(a_start_state.transitions):
         pi = None
-        first_t = pa_i.transitions[0][0] # my have only one transition
+        first_t = iter(pa_i.transitions).next()[0] # may have only one transition
         if first_t != epsilon and hasattr(first_t, 'pred'): # has predicate
             pi = first_t # pred
-        D0.add_all_confs(closure(D0, (pa_i, i, call_stack(), pi)))
+        D0.add_all_confs(closure(D0, atn_config(pa_i, i, call_stack(), pi)))
     work.append(D0)
     ret.add_state(D0)
     while len(work) != 0:
@@ -117,12 +122,12 @@ def creat_dfa(a_start_state):
                 resolve(d_state_new)
                 predicting_alts = d_state_new.get_all_predicting_alts()
                 if len(predicting_alts) == 1:
-                    d_state_new.alt = predicting_alts.pop()
-                    ret.overide_final_state(d_state_new.alt, d_state_new)
+                    d_state_new.alt = iter(predicting_alts).next()
+                    ret.override_final_state(d_state_new.alt, d_state_new)
                 else:
                     work.append(d_state_new)
                 ret.add_state(d_state_new)
             d_state.add_transition(a, d_state_new)
         for c in [c for c in d_state.confs if c.was_resolved]:
-            d_state.add_transition(c.pred, ret.final_referers[c.alt])
+            d_state.add_transition(c.pred, ret.final_states[c.alt])
     return ret
