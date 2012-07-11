@@ -226,6 +226,8 @@ class dfa_state(object):
         print "%s = %s" % (ret, content)
         return ret
     # adapt to automata-view end
+    def release_busy(self): # must clean busy set after every top-level 'closure' invocation 
+        self.busy.clear()
     
 # dummy pred used in experiments
 class dummy_pred(object):
@@ -293,4 +295,9 @@ class dfa(object):
         return "dfa(" + repr(self.states) + ")"
     def to_png(self, img_name):
         util.to_png(img_name, 50, 50, self.states)
+    def get_same_state(self, s): # return the state in dfa which is equal to the specified one
+        for state in self.states:
+            if state == s:
+                return state
+        return None
     

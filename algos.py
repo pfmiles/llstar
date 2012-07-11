@@ -110,6 +110,7 @@ def create_dfa(a_start_state):
         if first_t != epsilon and hasattr(first_t, 'pred'): # has predicate
             pi = first_t # pred
         D0.add_all_confs(closure(D0, atn_config(pa_i, i, call_stack(), pi)))
+        D0.release_busy()
     work.append(D0)
     ret.add_state(D0)
     while len(work) != 0:
@@ -118,6 +119,7 @@ def create_dfa(a_start_state):
             d_state_new = dfa_state()
             for conf in d_state.move(a): # move and closure
                 d_state_new.add_all_confs(closure(d_state, conf))
+                d_state.release_busy()
             if not ret.contain_state(d_state_new): # resolve and add to nfa network
                 resolve(d_state_new)
                 predicting_alts = d_state_new.get_all_predicting_alts()
@@ -127,7 +129,9 @@ def create_dfa(a_start_state):
                 else:
                     work.append(d_state_new)
                 ret.add_state(d_state_new)
-            d_state.add_transition(a, d_state_new)
+                d_state.add_transition(a, d_state_new)
+            else:
+                d_state.add_transition(a, ret.get_same_state(d_state_new)) # add the same state already in the dfa(not the newly created one)
         for c in [c for c in d_state.confs if c.was_resolved]:
             d_state.add_transition(c.pred, ret.final_states[c.alt])
     return ret
