@@ -1,5 +1,5 @@
 # some scripts to create atn network
-from datastructure import terminal, atn, dummy_pred, atn_state, epsilon, non_terminal, seq_gen
+from datastructure import terminal, dummy_pred, atn_state, epsilon, non_terminal, seq_gen
 
 # NOTE: this implementation does not support nested kleene closure structure, since this is an experiment, it needn't :)
 
@@ -80,7 +80,9 @@ class rule(object): # grammar rule creator
         return ret
     def get_n_term_this_rule(self): # get the non-terminal representing this rule
         return rule.name_rule_mapping[self.name]
-    def to_atn(self, a_net=atn()):
+    def get_start_state(self, a_net): # get the atn start state for this rule
+        return a_net.get_start_state(self.get_n_term_this_rule())
+    def merge_to_atn(self, a_net):
         ret = a_net
         pa = self.__new_atn_state(self.name, ret)# start state
         ret.n_term_start_state_mapping[self.get_n_term_this_rule()] = pa
