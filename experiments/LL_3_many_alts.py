@@ -2,7 +2,7 @@ from algos import create_dfa, globals_holder
 from atn_creation import rule
 from datastructure import atn
 
-# LL(3) grammar
+# LL(3) grammar with many alternatives
 # S ::= A $
 # A ::= B a*
 #     | C a+
