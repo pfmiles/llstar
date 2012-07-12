@@ -84,7 +84,7 @@ def closure(d_state, conf):
             if depth == 1:
                 d_state.recursive_alts.add(i)
                 if len(d_state.recursive_alts) > 1:
-                    raise Exception("Likely non-LL regular, recursive alts: " + `d_state.recursive_alts` + ", rule: " + `globals_holder.a_net.get_rule_of_state(p)`)
+                    raise Exception("Likely non-LL regular, recursive alts: " + str(d_state.recursive_alts) + ", rule: " + str(globals_holder.a_net.get_rule_of_state(p)))
             if depth >= MAX_REC_DEPTH:
                 d_state.overflowed = True
                 return ret
