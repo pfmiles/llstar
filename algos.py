@@ -38,38 +38,37 @@ def resolve_overflow(d_state):
 # alg.10 in paper
 def resolve_conflicts(d_state):
     # find conflict alts
-    conflicts = set()
-    conflict_k = None
     ss_alt = dict() # (state, stack) -> [alts]
-    ss_c = dict()
     for c in d_state.confs:
         k = (c.a_state, c.stack)
         if not k in ss_alt:
             ss_alt[k] = set()
-        if not k in ss_c:
-            ss_c[k] = []
         ss_alt[k].add(c.alt)
-        ss_c[k].append(c)
+    conflict_kvs = dict()
     for k, v in ss_alt.iteritems():
         if len(v) > 1:
-            conflicts = v
-            conflict_k = k
-            break # only one conflict set may exist
-    # if no conflicts or overflow, return
-    if len(conflicts) == 0:
+            conflict_kvs[k] = v
+    all_alts = d_state.get_all_predicting_alts()
+    all_conflicts_contain_all_alts = True
+    for v in conflict_kvs.itervalues():
+        if v != all_alts:
+            all_conflicts_contain_all_alts = False
+            break
+    # if no conflicts or any of the conflict configurations not contain all alts, return
+    if len(conflict_kvs) == 0 or not all_conflicts_contain_all_alts:
         return
+    
+    d_state.stop_transit = True
     # if conflicts resolved by preds, return
-    if resolve_with_preds(d_state, conflicts):
-        d_state.stop_transit = True
+    if resolve_with_preds(d_state, all_alts):
         return
     else:
         # resolve conflicts by alt defining order
-        min_alt = min(conflicts)
-        ccs = ss_c[conflict_k]
-        for c in ccs:
+        min_alt = min(all_alts)
+        for c in list(d_state.confs):
             if c.alt != min_alt:
                 d_state.remove_conf(c)
-        print "%s has conflict predicting alternatives: %s, resolved by selecting the first alt." % (d_state, conflicts)
+        print "%s has conflict predicting alternatives: %s, resolved by selecting the first alt." % (d_state, all_alts)
     
 # alg.9 in paper
 def closure(d_state, conf):
