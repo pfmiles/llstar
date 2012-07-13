@@ -4,8 +4,8 @@ from datastructure import atn
 
 # lookahead go over a recursive rule(overflowed, resolved by choosing earlier defined alternative)
 # S ::= A $
-# A ::= B a
-#     | b* c
+# A ::= {pred1}? B a
+#     | {pred2}? b* c
 # B ::= b+ B
 
 ra = rule('A')
@@ -13,8 +13,8 @@ rs = rule('S').ele('A').ele('eof')
 print rs
 
 rb = rule('B')
-ra.ele('B').ele('a')
-ra.alt().ks('b').ele('c')
+ra.ele('B').ele('a').pred('pred1')
+ra.alt().ks('b').ele('c').pred('pred2')
 print ra
 
 rb.kc('b').ele('B')

@@ -156,8 +156,11 @@ def create_dfa(a_start_state):
                 d_state.transitions.remove(t)
             for i in range(new_works_count):
                 work.pop()
+        pred_trans = set()
         for c in [c for c in d_state.confs if c.was_resolved]:
-            d_state.add_transition(c.pred, ret.final_states[c.alt])
+            pred_trans.add((c.pred, ret.final_states[c.alt]))
+        for p, s in pred_trans:
+            d_state.add_transition(p, s)
     return ret
 
 def check_if_final_and_replace(d_state, d_net): # check if the specified d_state is final and if so, replace the old final state with the same alt number

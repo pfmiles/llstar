@@ -232,14 +232,14 @@ class dfa_state(object):
     
 # dummy pred used in experiments
 class dummy_pred(object):
-    def __init__(self, result): # result should be True or False
+    def __init__(self, result): # result could be anything...just a symbol..take it easy
         self.result = result
     def pred(self):
         return self.result
     def __str__(self):
-        return `self.result`
+        return str(self.result)
     def __repr__(self):
-        return `self.result` 
+        return str(self.result) 
 
 # the whole atn network
 class atn(object):
