@@ -21,9 +21,22 @@ def resolve_with_preds(d_state, conflicts):
         for c in cs:
             c.was_resolved = True
     return True
+
+def resolve_overflow(d_state):
+    if not d_state.overflowed:
+        return
+    d_state.stop_transit = True # should stop compute when overflowed
+    conflicts = d_state.get_all_predicting_alts() # overflowed, treat all predicting alts as conflicts
+    if resolve_with_preds(d_state, conflicts):
+        return
+    min_alt = min(conflicts) # resolve_conflicts by removing all confs except the ones with min alt
+    for c in list(d_state.confs):
+        if c.alt != min_alt:
+            d_state.remove_conf(c)
+    print "%s overflowed, resolved by removing all alternative productions except the one defined first: %s" % (d_state, min_alt) 
     
 # alg.10 in paper
-def resolve(d_state):
+def resolve_conflicts(d_state):
     # find conflict alts
     conflicts = set()
     conflict_k = None
@@ -43,10 +56,11 @@ def resolve(d_state):
             conflict_k = k
             break # only one conflict set may exist
     # if no conflicts or overflow, return
-    if len(conflicts) == 0 and not d_state.overflowed:
+    if len(conflicts) == 0:
         return
     # if conflicts resolved by preds, return
     if resolve_with_preds(d_state, conflicts):
+        d_state.stop_transit = True
         return
     else:
         # resolve conflicts by alt defining order
@@ -55,9 +69,6 @@ def resolve(d_state):
         for c in ccs:
             if c.alt != min_alt:
                 d_state.remove_conf(c)
-    if d_state.overflowed:
-        print "%s overflowed, resolved by selecting the first predicting alternative." % d_state
-    else:
         print "%s has conflict predicting alternatives: %s, resolved by selecting the first alt." % (d_state, conflicts)
     
 # alg.9 in paper
@@ -115,23 +126,47 @@ def create_dfa(a_start_state):
     ret.add_state(D0)
     while len(work) != 0:
         d_state = work.pop()
+        new_trans = [] # remember transitions newly added
+        new_works_count = 0 # remember num of new works added
+        new_states = set() # remember new states discovered
         for a in d_state.get_all_terminal_edges():
             d_state_new = dfa_state()
             for conf in d_state.move(a): # move and closure
                 d_state_new.add_all_confs(closure(d_state, conf))
                 d_state.release_busy()
-            if not ret.contain_state(d_state_new): # resolve and add to nfa network
-                resolve(d_state_new)
-                predicting_alts = d_state_new.get_all_predicting_alts()
-                if len(predicting_alts) == 1:
-                    d_state_new.alt = iter(predicting_alts).next()
-                    ret.override_final_state(d_state_new.alt, d_state_new)
-                else:
+                resolve_overflow(d_state) # d_state may be marked overflowed while closuring, so it must be resolved
+                check_if_final_and_replace(d_state, ret)
+                if d_state.stop_transit: break
+            if d_state.stop_transit: break
+            if not ret.contain_state(d_state_new): # resolve_conflicts and add to dfa network
+                resolve_conflicts(d_state_new)
+                if not check_if_final_and_replace(d_state_new, ret):
                     work.append(d_state_new)
+                    new_works_count = new_works_count + 1
                 ret.add_state(d_state_new)
+                new_states.add(d_state_new)
                 d_state.add_transition(a, d_state_new)
+                new_trans.append((a, d_state_new))
             else:
                 d_state.add_transition(a, ret.get_same_state(d_state_new)) # add the same state already in the dfa(not the newly created one)
+                new_trans.append((a, ret.get_same_state(d_state_new)))
+        if d_state.stop_transit: # remove newly added states, transitions and works if d_state.stop_transit
+            for n_s in new_states:
+                ret.states.remove(n_s)
+            for t in new_trans:
+                d_state.transitions.remove(t)
+            for i in range(new_works_count):
+                work.pop()
         for c in [c for c in d_state.confs if c.was_resolved]:
             d_state.add_transition(c.pred, ret.final_states[c.alt])
     return ret
+
+def check_if_final_and_replace(d_state, d_net): # check if the specified d_state is final and if so, replace the old final state with the same alt number
+    predicting_alts = d_state.get_all_predicting_alts()
+    if len(predicting_alts) == 1: # is final
+        d_state.alt = iter(predicting_alts).next()
+        d_net.override_final_state(d_state.alt, d_state)
+        d_state.stop_transit = True
+        return True
+    return False
+    

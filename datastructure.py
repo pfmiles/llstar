@@ -155,6 +155,7 @@ class dfa_state(object):
         self.alt = alt # predicting alt of this dfa, -1 when not determined, only final dfa states has valid(greater than -1) alt number
         self.transitions = []
         self.id = None
+        self.stop_transit = False # if true, no more closure or move steps need to be performed
     def add_transition(self, edge, d_state):
         if not isinstance(edge, terminal) and not hasattr(edge, 'pred'):
             raise Exception("DFA transition edges could only be terminals or predicates.")
