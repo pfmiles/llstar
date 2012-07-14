@@ -25,6 +25,7 @@ def resolve_with_preds(d_state, conflicts):
 def resolve_overflow(d_state):
     if not d_state.overflowed:
         return
+    state_str = str(d_state)
     d_state.stop_transit = True # should stop compute when overflowed
     conflicts = d_state.get_all_predicting_alts() # overflowed, treat all predicting alts as conflicts
     if resolve_with_preds(d_state, conflicts):
@@ -33,7 +34,7 @@ def resolve_overflow(d_state):
     for c in list(d_state.confs):
         if c.alt != min_alt:
             d_state.remove_conf(c)
-    print "%s overflowed, resolved by removing all alternative productions except the one defined first: %s" % (d_state, min_alt) 
+    print "%s overflowed, resolved by removing all alternative productions except the one defined first: %s" % (state_str, min_alt) 
     
 # alg.10 in paper
 def resolve_conflicts(d_state):
@@ -63,12 +64,13 @@ def resolve_conflicts(d_state):
     if resolve_with_preds(d_state, all_alts):
         return
     else:
+        state_str = str(d_state)
         # resolve conflicts by alt defining order
         min_alt = min(all_alts)
         for c in list(d_state.confs):
             if c.alt != min_alt:
                 d_state.remove_conf(c)
-        print "%s has conflict predicting alternatives: %s, resolved by selecting the first alt." % (d_state, all_alts)
+        print "%s has conflict predicting alternatives: %s, resolved by selecting the first alt." % (state_str, all_alts)
     
 # alg.9 in paper
 def closure(d_state, conf):

@@ -2,10 +2,11 @@ from algos import create_dfa, globals_holder
 from atn_creation import rule
 from datastructure import atn
 
-# lookahead go over a recursive rule(overflowed, resolved by predicates)
+# conflicts mixed with overflow, resolved by predicates
 # S ::= A $
-# A ::= {pred1}? B a
-#     | {pred2}? b* c
+# A ::= B a
+#     | b* c
+#     | b* c
 # B ::= b+ B
 
 ra = rule('A')
@@ -15,6 +16,7 @@ print rs
 rb = rule('B')
 ra.ele('B').ele('a').pred('pred1')
 ra.alt().ks('b').ele('c').pred('pred2')
+ra.alt().ks('b').ele('c').pred('pred3')
 print ra
 
 rb.kc('b').ele('B')

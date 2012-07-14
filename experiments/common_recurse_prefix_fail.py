@@ -2,7 +2,7 @@ from algos import create_dfa, globals_holder
 from atn_creation import rule
 from datastructure import atn
 
-# rule A prefixed with recursive rule E, this should fail
+# rule A's two alts both prefixed with recursive rule E, this should fail
 # S ::= A eof
 # A ::= E a
 #     | E b

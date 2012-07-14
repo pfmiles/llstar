@@ -2,7 +2,7 @@ from algos import create_dfa, globals_holder
 from atn_creation import rule
 from datastructure import atn
 
-# lookahead analysis go over kleene nodes
+# lookahead analysis go over rule-contained-kleene-nodes
 # S ::= A $
 # A ::= B* b
 #     | C+ c
